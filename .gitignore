@@ -1,0 +1,21 @@
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Runtime uploads
+uploads/
+server/uploads/
+
+# Logs
+*.log
+npm-debug.log*
