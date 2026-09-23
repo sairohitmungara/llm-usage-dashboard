@@ -19,10 +19,6 @@ app.use(express.json());
 
 app.use("/api", usageRouter);
 
-// --------------------------------------------------
-// Upload configuration
-// --------------------------------------------------
-
 const uploadsDirectory = path.join(process.cwd(), "uploads");
 
 fs.mkdirSync(uploadsDirectory, {
@@ -49,20 +45,12 @@ const upload = multer({
   },
 });
 
-// --------------------------------------------------
-// Health check
-// --------------------------------------------------
-
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
     service: "llm-usage-dashboard",
   });
 });
-
-// --------------------------------------------------
-// Save usage to PostgreSQL
-// --------------------------------------------------
 
 async function saveUsage(params: {
   model: string;
@@ -96,10 +84,6 @@ async function saveUsage(params: {
     ],
   );
 }
-
-// --------------------------------------------------
-// Process text
-// --------------------------------------------------
 
 app.post("/api/process", async (req, res) => {
   try {
@@ -161,10 +145,6 @@ app.post("/api/process", async (req, res) => {
     });
   }
 });
-
-// --------------------------------------------------
-// Process PDF
-// --------------------------------------------------
 
 app.post(
   "/api/process-pdf",
@@ -243,10 +223,6 @@ app.post(
   },
 );
 
-// --------------------------------------------------
-// Multer / general error handler
-// --------------------------------------------------
-
 app.use(
   (
     error: unknown,
@@ -265,12 +241,8 @@ app.use(
   },
 );
 
-// --------------------------------------------------
-// Start server
-// --------------------------------------------------
-
-app.listen(PORT, "127.0.0.1", () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(
-    `Server running at http://127.0.0.1:${PORT}`,
+    `Server running on port ${PORT}`,
   );
 });
