@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 type UsageLog = {
@@ -9,18 +9,19 @@ type UsageLog = {
   total_tokens: number;
   request_count: number;
   cost: number;
-  source: string;
+  source: "text" | "pdf";
   created_at: string;
 };
 
 type ProcessResponse = {
+  success: boolean;
   result: string;
   usage: {
     model: string;
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-    requestCount: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    request_count: number;
     cost: number;
   };
 };
@@ -28,16 +29,17 @@ type ProcessResponse = {
 const API_URL = "https://llm-usage-dashboard.onrender.com";
 
 function App() {
+  const [inputMode, setInputMode] = useState<"text" | "pdf">("text");
   const [text, setText] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState("");
-  const [usage, setUsage] = useState<UsageLog[]>([]);
+  const [currentUsage, setCurrentUsage] =
+    useState<ProcessResponse["usage"] | null>(null);
+
+  const [usageLogs, setUsageLogs] = useState<UsageLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [error, setError] = useState("");
-
-  const [currentUsage, setCurrentUsage] =
-    useState<ProcessResponse["usage"] | null>(null);
 
   const loadUsage = async () => {
     try {
@@ -46,17 +48,13 @@ function App() {
       const response = await fetch(`${API_URL}/api/usage`);
 
       if (!response.ok) {
-        throw new Error("Failed to load usage history");
+        throw new Error("Failed to load usage data");
       }
 
       const data = await response.json();
-
-      const logs = Array.isArray(data) ? data : data.usage;
-
-      setUsage(Array.isArray(logs) ? logs : []);
+      setUsageLogs(data);
     } catch (err) {
-      console.error("Usage history error:", err);
-      setUsage([]);
+      console.error(err);
     } finally {
       setLoadingUsage(false);
     }
@@ -66,7 +64,9 @@ function App() {
     loadUsage();
   }, []);
 
-  const handleProcessText = async () => {
+  const handleProcessText = async (event: FormEvent) => {
+    event.preventDefault();
+
     if (!text.trim()) {
       setError("Please enter some text first.");
       return;
@@ -83,15 +83,13 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          text,
-        }),
+        body: JSON.stringify({ text }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to process text");
+        throw new Error(data.error || "Processing failed");
       }
 
       setResult(data.result);
@@ -99,24 +97,15 @@ function App() {
 
       await loadUsage();
     } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error ? err.message : "Failed to process text",
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleProcessPdf = async () => {
-    if (!selectedFile) {
-      setError("Please select a PDF file first.");
-      return;
-    }
-
-    if (selectedFile.type !== "application/pdf") {
-      setError("Only PDF files are supported.");
+    if (!file) {
+      setError("Please select a PDF first.");
       return;
     }
 
@@ -127,7 +116,7 @@ function App() {
       setCurrentUsage(null);
 
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", file);
 
       const response = await fetch(`${API_URL}/api/process-pdf`, {
         method: "POST",
@@ -137,7 +126,7 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to process PDF");
+        throw new Error(data.error || "PDF processing failed");
       }
 
       setResult(data.result);
@@ -145,298 +134,478 @@ function App() {
 
       await loadUsage();
     } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error ? err.message : "Failed to process PDF",
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
   };
 
-  const totalRequests = useMemo(() => {
-    return usage.reduce(
-      (total, item) => total + Number(item.request_count || 0),
-      0,
-    );
-  }, [usage]);
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
 
-  const totalInputTokens = useMemo(() => {
-    return usage.reduce(
-      (total, item) => total + Number(item.input_tokens || 0),
-      0,
-    );
-  }, [usage]);
+    if (!selectedFile) return;
 
-  const totalOutputTokens = useMemo(() => {
-    return usage.reduce(
-      (total, item) => total + Number(item.output_tokens || 0),
-      0,
-    );
-  }, [usage]);
+    if (selectedFile.type !== "application/pdf") {
+      setError("Only PDF files are supported.");
+      setFile(null);
+      return;
+    }
 
-  const totalTokens = useMemo(() => {
-    return usage.reduce(
-      (total, item) => total + Number(item.total_tokens || 0),
-      0,
-    );
-  }, [usage]);
-
-  const totalCost = useMemo(() => {
-    return usage.reduce(
-      (total, item) => total + Number(item.cost || 0),
-      0,
-    );
-  }, [usage]);
-
-  const formatCost = (cost: number) => {
-    return `$${Number(cost || 0).toFixed(6)}`;
+    setError("");
+    setFile(selectedFile);
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleString();
-  };
+  const totals = useMemo(() => {
+    return usageLogs.reduce(
+      (acc, log) => {
+        acc.requests += log.request_count;
+        acc.input += log.input_tokens;
+        acc.output += log.output_tokens;
+        acc.total += log.total_tokens;
+        acc.cost += Number(log.cost);
+        return acc;
+      },
+      {
+        requests: 0,
+        input: 0,
+        output: 0,
+        total: 0,
+        cost: 0,
+      },
+    );
+  }, [usageLogs]);
+
+  const textRequests = usageLogs.filter((log) => log.source === "text").length;
+  const pdfRequests = usageLogs.filter((log) => log.source === "pdf").length;
+
+  const averageTokens =
+    totals.requests > 0 ? Math.round(totals.total / totals.requests) : 0;
+
+  const formatNumber = (value: number) =>
+    new Intl.NumberFormat("en-US").format(value);
+
+  const formatCost = (value: number) =>
+    `$${value.toFixed(value === 0 ? 2 : 4)}`;
+
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   return (
-    <div className="app">
-      <div className="container">
-        <header className="header">
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-mark">
+            <span />
+            <span />
+            <span />
+          </div>
+
           <div>
-            <p className="eyebrow">LLM ANALYTICS</p>
+            <div className="brand-name">LLM Console</div>
+            <div className="brand-subtitle">Usage intelligence</div>
+          </div>
+        </div>
 
-            <h1>LLM Insight Hub</h1>
+        <div className="topbar-right">
+          <div className="status-pill">
+            <span className="status-dot" />
+            API Connected
+          </div>
 
-            <p className="subtitle">
-              Process text and PDF documents while tracking model usage,
-              tokens and estimated cost.
+          <button className="icon-button" onClick={loadUsage} title="Refresh">
+            ↻
+          </button>
+        </div>
+      </header>
+
+      <main className="dashboard">
+        <section className="hero">
+          <div>
+            <div className="eyebrow">
+              <span className="eyebrow-line" />
+              LLM ANALYTICS
+            </div>
+
+            <h1>
+              Understand every
+              <span> model request.</span>
+            </h1>
+
+            <p>
+              Process text and documents, monitor token consumption, and track
+              estimated LLM costs from one workspace.
             </p>
           </div>
 
-          <button
-            className="refresh-button"
-            onClick={loadUsage}
-            disabled={loadingUsage}
-          >
-            {loadingUsage ? "Refreshing..." : "Refresh"}
-          </button>
-        </header>
+          <div className="model-card">
+            <div className="model-card-label">ACTIVE MODEL</div>
 
-        <section className="stats-grid">
-          <div className="stat-card">
-            <span>Total Requests</span>
-            <strong>{totalRequests}</strong>
-          </div>
+            <div className="model-card-main">
+              <div className="model-icon">✦</div>
 
-          <div className="stat-card">
-            <span>Input Tokens</span>
-            <strong>{totalInputTokens.toLocaleString()}</strong>
-          </div>
-
-          <div className="stat-card">
-            <span>Output Tokens</span>
-            <strong>{totalOutputTokens.toLocaleString()}</strong>
-          </div>
-
-          <div className="stat-card">
-            <span>Total Tokens</span>
-            <strong>{totalTokens.toLocaleString()}</strong>
-          </div>
-
-          <div className="stat-card">
-            <span>Estimated Cost</span>
-            <strong>{formatCost(totalCost)}</strong>
-          </div>
-        </section>
-
-        <section className="workspace">
-          <div className="panel">
-            <div className="panel-header">
               <div>
-                <h2>Process Content</h2>
-                <p>Send text or upload a PDF for LLM processing.</p>
+                <strong>
+                  {currentUsage?.model || "openai/gpt-oss-20b"}
+                </strong>
+                <span>Groq · OpenAI compatible</span>
               </div>
             </div>
 
-            <label className="input-label">Text Input</label>
+            <div className="model-status">
+              <span />
+              Operational
+            </div>
+          </div>
+        </section>
 
-            <textarea
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Enter text you want the LLM to analyze..."
-              className="text-input"
-            />
-
-            <button
-              className="primary-button"
-              onClick={handleProcessText}
-              disabled={loading}
-            >
-              {loading ? "Processing..." : "Process Text"}
-            </button>
-
-            <div className="divider">
-              <span>OR</span>
+        <section className="metrics-grid">
+          <div className="metric-card primary">
+            <div className="metric-top">
+              <span>Total Requests</span>
+              <div className="metric-icon">↗</div>
             </div>
 
-            <label className="input-label">PDF Document</label>
+            <strong>{formatNumber(totals.requests)}</strong>
 
-            <div className="file-box">
-              <input
-                type="file"
-                accept=".pdf,application/pdf"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] || null;
-                  setSelectedFile(file);
+            <div className="metric-foot">
+              <span className="metric-accent">Live</span>
+              tracked requests
+            </div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-top">
+              <span>Total Tokens</span>
+              <div className="metric-icon">◇</div>
+            </div>
+
+            <strong>{formatNumber(totals.total)}</strong>
+
+            <div className="metric-foot">
+              Input {formatNumber(totals.input)} · Output{" "}
+              {formatNumber(totals.output)}
+            </div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-top">
+              <span>Estimated Cost</span>
+              <div className="metric-icon">$</div>
+            </div>
+
+            <strong>{formatCost(totals.cost)}</strong>
+
+            <div className="metric-foot">Based on model token pricing</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-top">
+              <span>Avg. Tokens</span>
+              <div className="metric-icon">⌁</div>
+            </div>
+
+            <strong>{formatNumber(averageTokens)}</strong>
+
+            <div className="metric-foot">Per request</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-top">
+              <span>Sources</span>
+              <div className="metric-icon">◈</div>
+            </div>
+
+            <strong>{textRequests + pdfRequests}</strong>
+
+            <div className="source-breakdown">
+              <span>
+                <i className="source-dot text-dot" />
+                Text {textRequests}
+              </span>
+
+              <span>
+                <i className="source-dot pdf-dot" />
+                PDF {pdfRequests}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="workspace-grid">
+          <div className="panel process-panel">
+            <div className="panel-header">
+              <div>
+                <div className="panel-kicker">PROCESS REQUEST</div>
+                <h2>Send data to your model</h2>
+              </div>
+
+              <div className="secure-label">
+                <span>●</span>
+                Secure request
+              </div>
+            </div>
+
+            <div className="mode-switch">
+              <button
+                className={inputMode === "text" ? "active" : ""}
+                onClick={() => {
+                  setInputMode("text");
                   setError("");
                 }}
-              />
+              >
+                <span>✎</span>
+                Text input
+              </button>
 
-              {selectedFile && (
-                <p className="file-name">
-                  Selected: <strong>{selectedFile.name}</strong>
-                </p>
-              )}
+              <button
+                className={inputMode === "pdf" ? "active" : ""}
+                onClick={() => {
+                  setInputMode("pdf");
+                  setError("");
+                }}
+              >
+                <span>▤</span>
+                PDF document
+              </button>
             </div>
 
-            <button
-              className="secondary-button"
-              onClick={handleProcessPdf}
-              disabled={loading || !selectedFile}
-            >
-              {loading ? "Processing..." : "Process PDF"}
-            </button>
+            {inputMode === "text" ? (
+              <form onSubmit={handleProcessText}>
+                <div className="input-label-row">
+                  <label>Prompt / Text</label>
+                  <span>{text.length} characters</span>
+                </div>
 
-            {error && <div className="error-box">{error}</div>}
+                <textarea
+                  value={text}
+                  onChange={(event) => setText(event.target.value)}
+                  placeholder="Enter text you want the LLM to analyze, summarize, classify, or extract information from..."
+                />
+
+                <button
+                  className="process-button"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Process with LLM
+                      <span>→</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              <div className="pdf-section">
+                <label className="input-label">PDF document</label>
+
+                <label className="upload-box">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleFileChange}
+                  />
+
+                  <div className="upload-icon">↑</div>
+
+                  <strong>
+                    {file ? file.name : "Drop your PDF here"}
+                  </strong>
+
+                  <span>
+                    {file
+                      ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
+                      : "or click to browse · PDF only"}
+                  </span>
+                </label>
+
+                <button
+                  className="process-button"
+                  onClick={handleProcessPdf}
+                  disabled={loading || !file}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner" />
+                      Processing document...
+                    </>
+                  ) : (
+                    <>
+                      Process PDF
+                      <span>→</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {error && <div className="error-message">{error}</div>}
           </div>
 
           <div className="panel result-panel">
             <div className="panel-header">
               <div>
-                <h2>LLM Result</h2>
-                <p>Extracted information from your request.</p>
+                <div className="panel-kicker">MODEL OUTPUT</div>
+                <h2>Processing result</h2>
               </div>
+
+              {result && (
+                <div className="result-ready">
+                  <span />
+                  Complete
+                </div>
+              )}
             </div>
 
-            {result ? (
-              <div className="result-box">
-                <div className="result-content">{result}</div>
-              </div>
-            ) : (
-              <div className="empty-state">
-                <div className="empty-icon">✦</div>
+            <div className={`result-area ${result ? "has-result" : ""}`}>
+              {loading ? (
+                <div className="empty-state">
+                  <div className="loading-orb">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
 
-                <h3>No result yet</h3>
+                  <strong>Processing your request</strong>
+                  <p>
+                    The model is analyzing your input and calculating usage.
+                  </p>
+                </div>
+              ) : result ? (
+                <div className="result-content">
+                  <div className="result-label">GENERATED RESPONSE</div>
 
-                <p>
-                  Enter text or upload a PDF and process it to see the
-                  extracted information here.
-                </p>
-              </div>
-            )}
+                  <div className="result-text">{result}</div>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon">✦</div>
+
+                  <strong>Your result will appear here</strong>
+
+                  <p>
+                    Submit text or upload a PDF to see the model response and
+                    usage details.
+                  </p>
+                </div>
+              )}
+            </div>
 
             {currentUsage && (
-              <div className="current-usage">
-                <h3>Request Usage</h3>
+              <div className="request-usage">
+                <div>
+                  <span>Input</span>
+                  <strong>
+                    {formatNumber(currentUsage.input_tokens)}
+                  </strong>
+                </div>
 
-                <div className="usage-mini-grid">
-                  <div>
-                    <span>Model</span>
-                    <strong>{currentUsage.model}</strong>
-                  </div>
+                <div>
+                  <span>Output</span>
+                  <strong>
+                    {formatNumber(currentUsage.output_tokens)}
+                  </strong>
+                </div>
 
-                  <div>
-                    <span>Input</span>
-                    <strong>{currentUsage.inputTokens}</strong>
-                  </div>
+                <div>
+                  <span>Total</span>
+                  <strong>
+                    {formatNumber(currentUsage.total_tokens)}
+                  </strong>
+                </div>
 
-                  <div>
-                    <span>Output</span>
-                    <strong>{currentUsage.outputTokens}</strong>
-                  </div>
-
-                  <div>
-                    <span>Total</span>
-                    <strong>{currentUsage.totalTokens}</strong>
-                  </div>
-
-                  <div>
-                    <span>Requests</span>
-                    <strong>{currentUsage.requestCount}</strong>
-                  </div>
-
-                  <div>
-                    <span>Cost</span>
-                    <strong>{formatCost(currentUsage.cost)}</strong>
-                  </div>
+                <div>
+                  <span>Cost</span>
+                  <strong>{formatCost(currentUsage.cost)}</strong>
                 </div>
               </div>
             )}
           </div>
         </section>
 
-        <section className="history-section">
-          <div className="section-heading">
+        <section className="panel overview-panel">
+          <div className="panel-header overview-header">
             <div>
-              <p className="eyebrow">MONITORING</p>
+              <div className="panel-kicker">ACTIVITY OVERVIEW</div>
+              <h2>Usage history</h2>
+            </div>
 
-              <h2>Usage History</h2>
+            <div className="history-meta">
+              <span className="history-count">
+                {usageLogs.length} records
+              </span>
 
-              <p>
-                Every processed request is recorded with token usage and
-                estimated cost.
-              </p>
+              <button onClick={loadUsage} disabled={loadingUsage}>
+                {loadingUsage ? "Refreshing..." : "Refresh data"}
+              </button>
             </div>
           </div>
 
-          <div className="table-wrapper">
-            {usage.length === 0 ? (
-              <div className="empty-history">
-                No usage history available yet.
+          <div className="table-wrap">
+            {usageLogs.length === 0 ? (
+              <div className="table-empty">
+                <div>◌</div>
+                <strong>No usage recorded yet</strong>
+                <span>
+                  Process a request and your usage history will appear here.
+                </span>
               </div>
             ) : (
               <table>
                 <thead>
                   <tr>
-                    <th>Time</th>
-                    <th>Source</th>
                     <th>Model</th>
+                    <th>Source</th>
                     <th>Input</th>
                     <th>Output</th>
                     <th>Total</th>
                     <th>Requests</th>
                     <th>Cost</th>
+                    <th>Time</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {usage.map((item) => (
-                    <tr key={item.id}>
-                      <td>{formatDate(item.created_at)}</td>
+                  {usageLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td>
+                        <div className="model-cell">
+                          <div className="mini-model-icon">✦</div>
+
+                          <div>
+                            <strong>{log.model}</strong>
+                            <span>Groq</span>
+                          </div>
+                        </div>
+                      </td>
 
                       <td>
-                        <span className="source-badge">
-                          {item.source}
+                        <span className={`source-badge ${log.source}`}>
+                          <i />
+                          {log.source === "pdf" ? "PDF" : "Text"}
                         </span>
                       </td>
 
-                      <td className="model-cell">{item.model}</td>
-
+                      <td>{formatNumber(log.input_tokens)}</td>
+                      <td>{formatNumber(log.output_tokens)}</td>
                       <td>
-                        {Number(item.input_tokens).toLocaleString()}
+                        <strong>{formatNumber(log.total_tokens)}</strong>
                       </td>
-
-                      <td>
-                        {Number(item.output_tokens).toLocaleString()}
+                      <td>{log.request_count}</td>
+                      <td className="cost-cell">{formatCost(log.cost)}</td>
+                      <td className="time-cell">
+                        {formatDate(log.created_at)}
                       </td>
-
-                      <td>
-                        {Number(item.total_tokens).toLocaleString()}
-                      </td>
-
-                      <td>{item.request_count}</td>
-
-                      <td>{formatCost(Number(item.cost))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -446,10 +615,13 @@ function App() {
         </section>
 
         <footer className="footer">
-          <span>LLM Insight Hub</span>
-          <span>Usage tracking enabled</span>
+          <span>LLM Console</span>
+          <span>·</span>
+          <span>Token-aware AI processing</span>
+          <span>·</span>
+          <span>v1.0</span>
         </footer>
-      </div>
+      </main>
     </div>
   );
 }
