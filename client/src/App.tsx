@@ -25,7 +25,7 @@ type ProcessResponse = {
   };
 };
 
-const API_URL = "http://127.0.0.1:5001";
+const API_URL = "https://llm-usage-dashboard.onrender.com";
 
 function App() {
   const [text, setText] = useState("");
@@ -51,8 +51,6 @@ function App() {
 
       const data = await response.json();
 
-      // Backend returns { usage: [...] }
-      // This also safely handles a direct array response.
       const logs = Array.isArray(data) ? data : data.usage;
 
       setUsage(Array.isArray(logs) ? logs : []);
@@ -424,11 +422,17 @@ function App() {
 
                       <td className="model-cell">{item.model}</td>
 
-                      <td>{Number(item.input_tokens).toLocaleString()}</td>
+                      <td>
+                        {Number(item.input_tokens).toLocaleString()}
+                      </td>
 
-                      <td>{Number(item.output_tokens).toLocaleString()}</td>
+                      <td>
+                        {Number(item.output_tokens).toLocaleString()}
+                      </td>
 
-                      <td>{Number(item.total_tokens).toLocaleString()}</td>
+                      <td>
+                        {Number(item.total_tokens).toLocaleString()}
+                      </td>
 
                       <td>{item.request_count}</td>
 
