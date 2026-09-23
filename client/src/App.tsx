@@ -1,4 +1,5 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import "./App.css";
 
 type UsageLog = {
@@ -163,6 +164,7 @@ function App() {
         acc.output += log.output_tokens;
         acc.total += log.total_tokens;
         acc.cost += Number(log.cost);
+
         return acc;
       },
       {
@@ -175,11 +177,18 @@ function App() {
     );
   }, [usageLogs]);
 
-  const textRequests = usageLogs.filter((log) => log.source === "text").length;
-  const pdfRequests = usageLogs.filter((log) => log.source === "pdf").length;
+  const textRequests = usageLogs.filter(
+    (log) => log.source === "text",
+  ).length;
+
+  const pdfRequests = usageLogs.filter(
+    (log) => log.source === "pdf",
+  ).length;
 
   const averageTokens =
-    totals.requests > 0 ? Math.round(totals.total / totals.requests) : 0;
+    totals.requests > 0
+      ? Math.round(totals.total / totals.requests)
+      : 0;
 
   const formatNumber = (value: number) =>
     new Intl.NumberFormat("en-US").format(value);
@@ -217,7 +226,11 @@ function App() {
             API Connected
           </div>
 
-          <button className="icon-button" onClick={loadUsage} title="Refresh">
+          <button
+            className="icon-button"
+            onClick={loadUsage}
+            title="Refresh"
+          >
             ↻
           </button>
         </div>
@@ -237,8 +250,8 @@ function App() {
             </h1>
 
             <p>
-              Process text and documents, monitor token consumption, and track
-              estimated LLM costs from one workspace.
+              Process text and documents, monitor token consumption,
+              and track estimated LLM costs from one workspace.
             </p>
           </div>
 
@@ -252,6 +265,7 @@ function App() {
                 <strong>
                   {currentUsage?.model || "openai/gpt-oss-20b"}
                 </strong>
+
                 <span>Groq · OpenAI compatible</span>
               </div>
             </div>
@@ -300,7 +314,9 @@ function App() {
 
             <strong>{formatCost(totals.cost)}</strong>
 
-            <div className="metric-foot">Based on model token pricing</div>
+            <div className="metric-foot">
+              Based on model token pricing
+            </div>
           </div>
 
           <div className="metric-card">
@@ -311,7 +327,9 @@ function App() {
 
             <strong>{formatNumber(averageTokens)}</strong>
 
-            <div className="metric-foot">Per request</div>
+            <div className="metric-foot">
+              Per request
+            </div>
           </div>
 
           <div className="metric-card">
@@ -340,7 +358,10 @@ function App() {
           <div className="panel process-panel">
             <div className="panel-header">
               <div>
-                <div className="panel-kicker">PROCESS REQUEST</div>
+                <div className="panel-kicker">
+                  PROCESS REQUEST
+                </div>
+
                 <h2>Send data to your model</h2>
               </div>
 
@@ -407,7 +428,9 @@ function App() {
               </form>
             ) : (
               <div className="pdf-section">
-                <label className="input-label">PDF document</label>
+                <label className="input-label">
+                  PDF document
+                </label>
 
                 <label className="upload-box">
                   <input
@@ -424,7 +447,9 @@ function App() {
 
                   <span>
                     {file
-                      ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
+                      ? `${(file.size / 1024 / 1024).toFixed(
+                          2,
+                        )} MB`
                       : "or click to browse · PDF only"}
                   </span>
                 </label>
@@ -449,13 +474,20 @@ function App() {
               </div>
             )}
 
-            {error && <div className="error-message">{error}</div>}
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
           </div>
 
           <div className="panel result-panel">
             <div className="panel-header">
               <div>
-                <div className="panel-kicker">MODEL OUTPUT</div>
+                <div className="panel-kicker">
+                  MODEL OUTPUT
+                </div>
+
                 <h2>Processing result</h2>
               </div>
 
@@ -467,7 +499,11 @@ function App() {
               )}
             </div>
 
-            <div className={`result-area ${result ? "has-result" : ""}`}>
+            <div
+              className={`result-area ${
+                result ? "has-result" : ""
+              }`}
+            >
               {loading ? (
                 <div className="empty-state">
                   <div className="loading-orb">
@@ -476,26 +512,36 @@ function App() {
                     <span />
                   </div>
 
-                  <strong>Processing your request</strong>
+                  <strong>
+                    Processing your request
+                  </strong>
+
                   <p>
-                    The model is analyzing your input and calculating usage.
+                    The model is analyzing your input and
+                    calculating usage.
                   </p>
                 </div>
               ) : result ? (
                 <div className="result-content">
-                  <div className="result-label">GENERATED RESPONSE</div>
+                  <div className="result-label">
+                    GENERATED RESPONSE
+                  </div>
 
-                  <div className="result-text">{result}</div>
+                  <div className="result-text">
+                    {result}
+                  </div>
                 </div>
               ) : (
                 <div className="empty-state">
                   <div className="empty-icon">✦</div>
 
-                  <strong>Your result will appear here</strong>
+                  <strong>
+                    Your result will appear here
+                  </strong>
 
                   <p>
-                    Submit text or upload a PDF to see the model response and
-                    usage details.
+                    Submit text or upload a PDF to see the
+                    model response and usage details.
                   </p>
                 </div>
               )}
@@ -506,27 +552,35 @@ function App() {
                 <div>
                   <span>Input</span>
                   <strong>
-                    {formatNumber(currentUsage.input_tokens)}
+                    {formatNumber(
+                      currentUsage.input_tokens,
+                    )}
                   </strong>
                 </div>
 
                 <div>
                   <span>Output</span>
                   <strong>
-                    {formatNumber(currentUsage.output_tokens)}
+                    {formatNumber(
+                      currentUsage.output_tokens,
+                    )}
                   </strong>
                 </div>
 
                 <div>
                   <span>Total</span>
                   <strong>
-                    {formatNumber(currentUsage.total_tokens)}
+                    {formatNumber(
+                      currentUsage.total_tokens,
+                    )}
                   </strong>
                 </div>
 
                 <div>
                   <span>Cost</span>
-                  <strong>{formatCost(currentUsage.cost)}</strong>
+                  <strong>
+                    {formatCost(currentUsage.cost)}
+                  </strong>
                 </div>
               </div>
             )}
@@ -536,7 +590,10 @@ function App() {
         <section className="panel overview-panel">
           <div className="panel-header overview-header">
             <div>
-              <div className="panel-kicker">ACTIVITY OVERVIEW</div>
+              <div className="panel-kicker">
+                ACTIVITY OVERVIEW
+              </div>
+
               <h2>Usage history</h2>
             </div>
 
@@ -545,8 +602,13 @@ function App() {
                 {usageLogs.length} records
               </span>
 
-              <button onClick={loadUsage} disabled={loadingUsage}>
-                {loadingUsage ? "Refreshing..." : "Refresh data"}
+              <button
+                onClick={loadUsage}
+                disabled={loadingUsage}
+              >
+                {loadingUsage
+                  ? "Refreshing..."
+                  : "Refresh data"}
               </button>
             </div>
           </div>
@@ -555,9 +617,14 @@ function App() {
             {usageLogs.length === 0 ? (
               <div className="table-empty">
                 <div>◌</div>
-                <strong>No usage recorded yet</strong>
+
+                <strong>
+                  No usage recorded yet
+                </strong>
+
                 <span>
-                  Process a request and your usage history will appear here.
+                  Process a request and your usage history
+                  will appear here.
                 </span>
               </div>
             ) : (
@@ -580,29 +647,58 @@ function App() {
                     <tr key={log.id}>
                       <td>
                         <div className="model-cell">
-                          <div className="mini-model-icon">✦</div>
+                          <div className="mini-model-icon">
+                            ✦
+                          </div>
 
                           <div>
-                            <strong>{log.model}</strong>
+                            <strong>
+                              {log.model}
+                            </strong>
+
                             <span>Groq</span>
                           </div>
                         </div>
                       </td>
 
                       <td>
-                        <span className={`source-badge ${log.source}`}>
+                        <span
+                          className={`source-badge ${log.source}`}
+                        >
                           <i />
-                          {log.source === "pdf" ? "PDF" : "Text"}
+
+                          {log.source === "pdf"
+                            ? "PDF"
+                            : "Text"}
                         </span>
                       </td>
 
-                      <td>{formatNumber(log.input_tokens)}</td>
-                      <td>{formatNumber(log.output_tokens)}</td>
                       <td>
-                        <strong>{formatNumber(log.total_tokens)}</strong>
+                        {formatNumber(
+                          log.input_tokens,
+                        )}
                       </td>
+
+                      <td>
+                        {formatNumber(
+                          log.output_tokens,
+                        )}
+                      </td>
+
+                      <td>
+                        <strong>
+                          {formatNumber(
+                            log.total_tokens,
+                          )}
+                        </strong>
+                      </td>
+
                       <td>{log.request_count}</td>
-                      <td className="cost-cell">{formatCost(log.cost)}</td>
+
+                      <td className="cost-cell">
+                        {formatCost(log.cost)}
+                      </td>
+
                       <td className="time-cell">
                         {formatDate(log.created_at)}
                       </td>
@@ -617,7 +713,9 @@ function App() {
         <footer className="footer">
           <span>LLM Console</span>
           <span>·</span>
-          <span>Token-aware AI processing</span>
+          <span>
+            Token-aware AI processing
+          </span>
           <span>·</span>
           <span>v1.0</span>
         </footer>
